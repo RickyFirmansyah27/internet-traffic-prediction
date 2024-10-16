@@ -91,7 +91,7 @@ def predict_traffic(model, jam, ping, jitter, packet_loss, speed_mbps):
     return prediction
 
 def main():
-    st.title("Prediksi Traffic Berdasarkan Kecepatan Mbps")
+    st.title("Internet Traffic Prediction with Naive Bayes")
 
     # Upload file
     st.sidebar.subheader('Data Training')
