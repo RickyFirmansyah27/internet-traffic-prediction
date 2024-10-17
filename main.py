@@ -18,7 +18,8 @@ def load_data(file):
 def data_training(df):
     X = df.drop(columns="traffic")
     y = df.traffic
-    # Split data into training and testing (75% train, 25% test)
+
+    # Preprocessing (75% train, 25% test)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 
     # Preprocessing
@@ -32,8 +33,6 @@ def data_training(df):
         ('algo', GaussianNB())
     ])
     pipeline.fit(X_train, y_train)
-
-    # Save the model
     joblib.dump(pipeline, 'traffic_model.pkl')
     
     return pipeline, X_train, X_test, y_train, y_test
@@ -67,17 +66,36 @@ def show_confusion_matrices(y_train, y_pred_train, y_test, y_pred_test):
     sns.heatmap(cm_train, annot=True, fmt='d', cmap='Blues', ax=axes[0], xticklabels=['Low Traffic', 'High Traffic'], yticklabels=['Low Traffic', 'High Traffic'])
     axes[0].set_xlabel('Prediksi')
     axes[0].set_ylabel('Aktual')
-    axes[0].set_title('Confusion Matrix - Data Training')
+    axes[0].set_title('Data Training')
 
     # Testing Confusion Matrix
     sns.heatmap(cm_test, annot=True, fmt='d', cmap='Blues', ax=axes[1], xticklabels=['Low Traffic', 'High Traffic'], yticklabels=['Low Traffic', 'High Traffic'])
     axes[1].set_xlabel('Prediksi')
     axes[1].set_ylabel('Aktual')
-    axes[1].set_title('Confusion Matrix - Data Testing')
+    axes[1].set_title('Data Testing')
 
     # Display the plot
     st.pyplot(fig)
-    plt.clf()  # Clear the figure after showing it
+    plt.clf()
+
+def show_nb_testing(y_test, y_pred_test):
+    st.write('')
+    st.subheader('Confusion Matrix')
+
+    # Create confusion matrix
+    cm_test = confusion_matrix(y_test, y_pred_test)
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Testing Confusion Matrix
+    sns.heatmap(cm_test, annot=True, fmt='d', cmap='Blues', ax=ax, xticklabels=['Low Traffic', 'High Traffic'], yticklabels=['Low Traffic', 'High Traffic'])
+    ax.set_xlabel('Prediksi')
+    ax.set_ylabel('Aktual')
+    ax.set_title('Confusion Matrix - Data Testing')
+
+    # Display the plot
+    st.pyplot(fig)
+    plt.clf()
 
 def predict_traffic(model, jam, ping, jitter, packet_loss, speed_mbps):
     input_data = pd.DataFrame(
@@ -92,12 +110,9 @@ def predict_traffic(model, jam, ping, jitter, packet_loss, speed_mbps):
 
 def main():
     st.title("Internet Traffic Prediction with Naive Bayes")
-
-    # Upload file
     st.sidebar.subheader('Data Training')
     file = st.sidebar.file_uploader(label='Pilih data training', type=('xlsx'))
     
-    # Button for training
     if st.sidebar.button('Training Model'):
         if file is not None:
             st.sidebar.write('File Uploaded')
@@ -105,16 +120,12 @@ def main():
                 df_train = pd.read_excel(file)
                 pipeline, X_train, X_test, y_train, y_test = data_training(df_train)
                 st.success("Model telah dilatih dan disimpan.")
-                
-                # Menampilkan DataFrame dari dataset
                 st.subheader('Dataset untuk Training')
                 st.write(df_train)
 
-                # Melakukan prediksi pada data training dan testing
                 y_pred_train = pipeline.predict(X_train)
                 y_pred_test = pipeline.predict(X_test)
                 
-                # Menampilkan confusion matrices
                 show_confusion_matrices(y_train, y_pred_train, y_test, y_pred_test)
 
             except Exception as e:
@@ -122,7 +133,6 @@ def main():
         else:
             st.warning("Silakan unggah file data training terlebih dahulu.")
 
-    # Button for testing with a new file
     st.sidebar.subheader('Testing Model')
     test_file = st.sidebar.file_uploader(label='Pilih data testing', type=('xlsx'), key='test_file')
 
@@ -130,17 +140,23 @@ def main():
         if test_file is not None:
             df_test = pd.read_excel(test_file)
             model = joblib.load('traffic_model.pkl')
-            # Lakukan prediksi
             y_pred = model.predict(df_test)
-            # Tambahkan kolom prediksi ke DataFrame
+
             df_test['Prediksi'] = y_pred
             df_test['Label'] = df_test['Prediksi'].apply(lambda x: 'Tinggi' if x == 1 else 'Rendah')
             st.write("Hasil Prediksi:")
             st.write(df_test)
+
+            test_file = st.session_state.get('test_file')
+            df_test = pd.read_excel(test_file)
+            X_test = df_test.drop(columns="traffic")
+            y_test = df_test.traffic
+            y_pred_test = model.predict(X_test)
+            show_nb_testing(y_test, y_pred_test)
+
         else:
             st.warning("Silakan unggah file data testing terlebih dahulu.")
 
-    # Input prediksi
     st.subheader('Form Prediksi Traffic')
     form = st.form(key='prediction_form')
     jam = form.selectbox('Jam', [9, 13, 17])
@@ -152,7 +168,6 @@ def main():
     submit = form.form_submit_button('Submit untuk Prediksi')
     
     if submit:
-        # Memuat model yang telah ada
         model = joblib.load('traffic_model.pkl')
         prediction = predict_traffic(model, jam, ping, jitter, packet_loss, speed_mbps)
         st.write("Hasil Prediksi:")
